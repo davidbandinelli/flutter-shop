@@ -6,8 +6,9 @@ import 'package:http/http.dart' as http;
 
 class Products with ChangeNotifier {
   final String authToken;
+  final String userId;
 
-  Products(this.authToken, this._items);
+  Products(this.authToken, this.userId, this._items);
 
   List<Product> _items = [
     /*
@@ -78,15 +79,21 @@ class Products with ChangeNotifier {
   // }
 
   // caricamento iniziale lista prodotti dal backend
-  Future<void> fetchAndSetProducts() async {
-    final url =
-        'https://flutter-shop-backend-d5008.firebaseio.com/products.json?auth=$authToken';
+  Future<void> fetchAndSetProducts([bool filterByUser = false]) async {
+    final filterString =
+        filterByUser ? 'orderBy="creatorId"&equalTo="$userId"' : '';
+    var url =
+        'https://flutter-shop-backend-d5008.firebaseio.com/products.json?auth=$authToken&orderBy="creatorId"&$filterString';
     try {
       final response = await http.get(url);
       final extractedData = json.decode(response.body) as Map<String, dynamic>;
       if (extractedData == null) {
         return;
       }
+      url =
+          'https://flutter-shop-backend-d5008.firebaseio.com/userFavorites/$userId.json?auth=$authToken';
+      final favoriteResponse = await http.get(url);
+      final favoriteData = json.decode(favoriteResponse.body);
       final List<Product> loadedProducts = [];
       extractedData.forEach((prodId, prodData) {
         loadedProducts.add(Product(
@@ -94,7 +101,9 @@ class Products with ChangeNotifier {
             title: prodData['title'],
             description: prodData['description'],
             price: prodData['price'],
-            isFavorite: prodData['isFavorite'],
+            //isFavorite: prodData['isFavorite'],
+            isFavorite:
+                favoriteData == null ? false : favoriteData[prodId] ?? false,
             imageUrl: prodData['imageUrl']));
       });
       _items = loadedProducts;
@@ -115,8 +124,9 @@ class Products with ChangeNotifier {
           'title': product.title,
           'description': product.description,
           'price': product.price,
-          'isFavorite': product.isFavorite,
-          'imageUrl': product.imageUrl
+          //'isFavorite': product.isFavorite,
+          'imageUrl': product.imageUrl,
+          'creatorId': userId,
         }),
       );
       print(json.decode(response.body));
